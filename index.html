@@ -1,0 +1,2634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Mohana • Smart Bike Navigation</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Google Fonts: Plus Jakarta Sans & Material Symbols Outlined -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <style>
+        :root {
+            --bg-deep: #000000;
+            --bg-card-dark: #0f1217;
+            --bg-card-darker: #080a0e;
+            --card-white: #ffffff;
+            --accent-lime: #d4ff00;
+            --accent-lime-hover: #bce600;
+            --accent-lime-dim: rgba(212, 255, 0, 0.15);
+            --text-dark: #000000;
+            --text-white: #ffffff;
+            --text-muted: #94a3b8;
+            --text-subtle: #64748b;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-light: rgba(0, 0, 0, 0.08);
+            --shadow-float: 0 16px 36px rgba(0, 0, 0, 0.7);
+            --radius-pill: 9999px;
+            --radius-card: 24px;
+            --radius-sm: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        html, body {
+            height: 100%;
+            height: 100dvh;
+            height: var(--vh, 100dvh);
+            max-height: var(--vh, 100dvh);
+            width: 100vw;
+            overflow: hidden;
+            background-color: var(--bg-deep);
+            color: var(--text-white);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 20px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+            vertical-align: middle;
+            -webkit-user-select: none;
+               -moz-user-select: none;
+                    user-select: none;
+        }
+
+        /* ==========================================================================
+           TOP NAVIGATION SWITCHER TABS
+           ========================================================================== */
+        .app-nav-tabs {
+            position: fixed;
+            top: max(8px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1500;
+            display: flex;
+            background: rgba(15, 18, 23, 0.94);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-pill);
+            padding: 3px;
+            gap: 4px;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.85);
+            white-space: nowrap;
+            transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+        }
+
+        /* Auto-hide only when scrolling inside the connect screen */
+        .app-nav-tabs.hidden-on-scroll {
+            transform: translate(-50%, -75px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .nav-tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 7px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .nav-tab-btn .material-symbols-outlined {
+            font-size: 17px;
+        }
+
+        .nav-tab-btn.active {
+            background: var(--accent-lime);
+            color: var(--text-dark);
+            box-shadow: 0 2px 10px rgba(212, 255, 0, 0.35);
+        }
+
+        .screen-view {
+            width: 100vw;
+            height: 100%;
+            height: 100dvh;
+            height: var(--vh, 100dvh);
+            max-height: var(--vh, 100dvh);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            display: none;
+        }
+
+        .screen-view.active {
+            display: block;
+        }
+
+        /* ==========================================================================
+           INTERFACE 1: MOHANA CONNECTION SCREEN
+           ========================================================================== */
+        #connectScreen {
+            background: radial-gradient(circle at 50% 15%, #151a10 0%, #000000 70%);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: max(32px, env(safe-area-inset-bottom));
+        }
+
+        .connect-container {
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100%;
+            padding: calc(max(10px, env(safe-area-inset-top)) + 58px) 18px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .connect-brand-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2px;
+        }
+
+        .brand-logo-text {
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .brand-logo-text span.brand-reg {
+            color: var(--accent-lime);
+            font-size: 13px;
+            vertical-align: super;
+            font-weight: 700;
+        }
+
+        .ble-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: var(--radius-pill);
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .ble-status-pill.connected {
+            background: rgba(212, 255, 0, 0.15);
+            border-color: rgba(212, 255, 0, 0.5);
+            color: var(--accent-lime);
+        }
+
+        .ble-status-pill.connecting {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.5);
+            color: #fbbf24;
+        }
+
+        .status-dot-pulse {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: currentColor;
+            display: inline-block;
+        }
+
+        .ble-status-pill.connected .status-dot-pulse {
+            box-shadow: 0 0 8px var(--accent-lime);
+        }
+
+        /* Hero Device Card */
+        .bike-hero-card {
+            background: linear-gradient(180deg, #12161f 0%, #080a0e 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-card);
+            padding: 20px 18px;
+            position: relative;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+        }
+
+        .bike-hero-card::before {
+            content: '';
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            width: 160px;
+            height: 160px;
+            background: radial-gradient(circle, rgba(212, 255, 0, 0.14) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .bike-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .bike-title {
+            font-size: 24px;
+            font-weight: 900;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+        }
+
+        .bike-sub-badge {
+            font-size: 11px;
+            color: var(--accent-lime);
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .bike-arrow-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            cursor: pointer;
+        }
+
+        /* TOP-VIEW BIKE HANDLEBAR WITH HIGHLIGHTED VIBRATION MOTORS */
+        .handlebar-view-wrap {
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 12px 0 10px;
+            position: relative;
+        }
+
+        .handlebar-svg {
+            width: 100%;
+            max-width: 330px;
+            height: 130px;
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.85));
+        }
+
+        /* 2x2 GRID TILES (Dark Industrial Surface matching Mohana Dark Theme) */
+        .haptic-tiles-container {
+            background: #141922;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 22px;
+            padding: 9px;
+            margin: 14px 0 18px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+        }
+
+        .haptic-tiles-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .haptic-tile {
+            background: #0a0d12;
+            border-radius: 16px;
+            padding: 12px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            transition: transform 0.15s ease, border-color 0.2s ease;
+        }
+
+        .haptic-tile:hover {
+            border-color: rgba(212, 255, 0, 0.4);
+        }
+
+        .haptic-tile:active {
+            transform: scale(0.96);
+        }
+
+        .haptic-tile-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(212, 255, 0, 0.12);
+            color: var(--accent-lime);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .haptic-tile-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-top: 2px;
+        }
+
+        .haptic-tile-sub {
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            line-height: 1.25;
+        }
+
+        /* Connect Action Button */
+        .btn-connect-action {
+            width: 100%;
+            padding: 14px 18px;
+            border-radius: var(--radius-pill);
+            background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+        }
+
+        .btn-connect-action.connected {
+            background: var(--accent-lime);
+            color: var(--text-dark);
+            border-color: var(--accent-lime);
+            box-shadow: 0 6px 20px rgba(212, 255, 0, 0.35);
+        }
+
+        .btn-connect-action:active {
+            transform: scale(0.98);
+        }
+
+        .btn-connect-action .lock-icon-circle {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-connect-action.connected .lock-icon-circle {
+            background: #000000;
+            color: var(--accent-lime);
+        }
+
+        /* Diagnostic Bench Card */
+        .bench-test-card {
+            background: rgba(18, 21, 27, 0.7);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-card);
+            padding: 16px 18px;
+        }
+
+        .bench-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .test-motor-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .btn-test-cue {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            color: #ffffff;
+            padding: 10px 4px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-test-cue .material-symbols-outlined {
+            font-size: 18px;
+        }
+
+        .btn-test-cue:active {
+            background: var(--accent-lime);
+            color: var(--text-dark);
+            transform: scale(0.95);
+        }
+
+        /* Mohana Rider-First Slogan Banner */
+        .feature-card-lime {
+            background: #bbf000;
+            border-radius: var(--radius-card);
+            padding: 20px 18px;
+            color: #000000;
+        }
+
+        .feature-card-lime h2 {
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            line-height: 1.1;
+            margin-bottom: 6px;
+        }
+
+        .feature-card-lime p {
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.45;
+            color: #1e293b;
+        }
+
+        /* ==========================================================================
+           INTERFACE 2: YOUR RIDE SCREEN (Pure Black Map)
+           ========================================================================== */
+        #rideScreen {
+            background-color: #000000;
+        }
+
+        #map {
+            width: 100vw;
+            height: 100%;
+            height: 100dvh;
+            background: #000000 !important;
+            z-index: 1;
+        }
+
+        .leaflet-tile-pane {
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+        .leaflet-container {
+            background: #000000 !important;
+        }
+
+        /* Top Controls Overlay */
+        .ride-top-overlay {
+            position: absolute;
+            top: max(8px, env(safe-area-inset-top));
+            left: 14px;
+            right: 14px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 440px;
+            margin: 0 auto;
+            pointer-events: none;
+        }
+
+        .ride-top-overlay > * {
+            pointer-events: auto;
+        }
+
+        .ride-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 48px;
+        }
+
+        .ride-screen-title {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.9);
+            white-space: nowrap;
+        }
+
+        /* Auto-Center Tracking Lock Button */
+        .recenter-fab {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(18, 21, 27, 0.9);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            transition: all 0.2s ease;
+        }
+
+        .recenter-fab.active-follow {
+            border-color: var(--accent-lime);
+            box-shadow: 0 0 16px rgba(212, 255, 0, 0.45);
+            color: var(--accent-lime);
+        }
+
+        .recenter-fab:active {
+            transform: scale(0.92);
+        }
+
+        /* Search Box */
+        .minimal-search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .minimal-search-input-wrap {
+            display: flex;
+            align-items: center;
+            background: rgba(18, 21, 27, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-pill);
+            padding: 2px 4px 2px 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+            transition: border-color 0.2s;
+            height: 40px;
+        }
+
+        .minimal-search-input-wrap:focus-within {
+            border-color: var(--accent-lime);
+        }
+
+        .minimal-search-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 6px 4px;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+        }
+
+        .minimal-search-input::-moz-placeholder {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .minimal-search-input::placeholder {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .search-action-btn {
+            background: var(--accent-lime);
+            color: var(--text-dark);
+            border: none;
+            border-radius: var(--radius-pill);
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .search-cancel-btn {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-pill);
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-left: 6px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .search-cancel-btn:active {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Search Focus Mode (Hides surrounding HUD elements so keyboard doesn't obstruct search) */
+        #rideScreen.search-focused-mode .ride-top-bar {
+            display: none !important;
+        }
+
+        #rideScreen.search-focused-mode .ride-bottom-deck {
+            display: none !important;
+        }
+
+        #rideScreen.search-focused-mode .search-cancel-btn {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #rideScreen.search-focused-mode .minimal-suggestions {
+            max-height: 52vh;
+            z-index: 1500;
+        }
+
+        .search-focused-tabs-hide {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Active Navigation Mode (Separates Top Turn Banner and Recenter FAB) */
+        #rideScreen.navigating-active .ride-top-bar {
+            margin-top: 0;
+            position: static;
+            pointer-events: none;
+        }
+
+        #rideScreen.navigating-active .ride-screen-title {
+            display: none !important;
+        }
+
+        #rideScreen.navigating-active #trackFollowBtn {
+            position: absolute;
+            top: calc(max(10px, env(safe-area-inset-top)) + 140px);
+            right: 16px;
+            z-index: 1200;
+            pointer-events: auto;
+        }
+
+        .minimal-suggestions {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: rgba(18, 21, 27, 0.98);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 18px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            box-shadow: var(--shadow-float);
+            z-index: 1050;
+        }
+
+        .suggest-row {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .suggest-row:last-child {
+            border-bottom: none;
+        }
+
+        .suggest-row:active {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .suggest-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .suggest-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Active Turn Maneuver HUD */
+        .nav-cue-banner {
+            position: absolute;
+            top: calc(max(10px, env(safe-area-inset-top)) + 52px);
+            left: 16px;
+            right: 16px;
+            max-width: 440px;
+            margin: 0 auto;
+            background: rgba(18, 21, 27, 0.95);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 2px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 12px 16px;
+            z-index: 1100;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 16px 36px rgba(0,0,0,0.85);
+            transition: border-color 0.3s ease;
+        }
+
+        .nav-cue-banner.alert-pulsing {
+            border-color: var(--accent-lime);
+            animation: pulseGlow 1.2s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            from { box-shadow: 0 0 14px rgba(212, 255, 0, 0.3); }
+            to { box-shadow: 0 0 32px rgba(212, 255, 0, 0.85); }
+        }
+
+        .cue-icon-wrap {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #000000;
+            border: 2px solid var(--accent-lime);
+            color: var(--accent-lime);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .cue-icon-wrap .material-symbols-outlined {
+            font-size: 26px;
+        }
+
+        .cue-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .cue-distance-line {
+            font-size: 24px;
+            font-weight: 900;
+            color: #ffffff;
+            line-height: 1;
+        }
+
+        .cue-distance-line span {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-left: 2px;
+        }
+
+        .cue-street-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cue-haptic-badge {
+            display: none;
+            background: rgba(212, 255, 0, 0.2);
+            color: var(--accent-lime);
+            border: 1px solid var(--accent-lime);
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 3px;
+            width: -moz-fit-content;
+            width: fit-content;
+        }
+
+        /* ==========================================================================
+           BOTTOM DASHBOARD CONTROLS (Compact & Responsive)
+           ========================================================================== */
+        .ride-bottom-deck {
+            position: absolute;
+            bottom: max(10px, calc(env(safe-area-inset-bottom, 0px) + 6px));
+            left: 12px;
+            right: 12px;
+            max-width: 440px;
+            margin: 0 auto;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: none;
+        }
+
+        .ride-bottom-deck > * {
+            pointer-events: auto;
+        }
+
+        /* 1. Trip Stats Bar: Duration, Distance, Haptic Cues (No Avg Speed, No Calories) */
+        .stats-bar-card {
+            background: rgba(18, 21, 27, 0.94);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 8px 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+        }
+
+        .stat-col {
+            display: flex;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .stat-col:not(:last-child) {
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .stat-heading {
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .stat-main-val {
+            font-size: 15px;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+        }
+
+        .stat-main-val .material-symbols-outlined {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .stat-sub-unit {
+            font-size: 9px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-top: 1px;
+        }
+
+        /* 2. Location White Card */
+        .location-white-card {
+            background: var(--card-white);
+            border-radius: 18px;
+            padding: 8px 14px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.25s ease;
+        }
+
+        .loc-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .loc-icon-bubble {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: var(--text-dark);
+        }
+
+        .loc-icon-bubble .material-symbols-outlined {
+            font-size: 14px;
+        }
+
+        .loc-text-col {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .loc-type-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .loc-name-value {
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--text-dark);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 1px;
+        }
+
+        .loc-chevron {
+            color: #94a3b8;
+            font-size: 16px;
+        }
+
+        .loc-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 0 2px;
+        }
+
+        /* 3. SYMMETRICAL DUAL-DIRECTION SLIDER (Slide L->R to Start, Slide R->L to End) */
+        .slide-action-track {
+            position: relative;
+            width: 100%;
+            height: 48px;
+            background: #0f131a;
+            border: 1.5px solid rgba(212, 255, 0, 0.4);
+            border-radius: var(--radius-pill);
+            padding: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+            -webkit-user-select: none;
+               -moz-user-select: none;
+                    user-select: none;
+            touch-action: pan-y;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .slider-progress-fill {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            border-radius: var(--radius-pill);
+            pointer-events: none;
+            transition: width 0.05s ease-out;
+        }
+
+        /* Forward Start Mode Fill: expands from left */
+        .slide-action-track:not(.active-nav-mode) .slider-progress-fill {
+            left: 0;
+            width: 0%;
+            background: linear-gradient(90deg, rgba(212, 255, 0, 0.15), rgba(212, 255, 0, 0.45));
+        }
+
+        /* Ending Ride Mode Fill: expands from right */
+        .slide-action-track.active-nav-mode .slider-progress-fill {
+            right: 0;
+            width: 0%;
+            background: linear-gradient(270deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.55));
+        }
+
+        .slider-label-text {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+            -webkit-user-select: none;
+               -moz-user-select: none;
+                    user-select: none;
+        }
+
+        .slide-action-track:not(.active-nav-mode) .slider-label-text {
+            color: rgba(255, 255, 255, 0.4);
+            background: linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(212,255,0,0.95) 50%, rgba(255,255,255,0.3) 100%);
+            background-size: 200% 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmerSweep 2.2s infinite linear;
+            padding-left: 24px;
+        }
+
+        .slide-action-track.active-nav-mode .slider-label-text {
+            color: #f87171;
+            padding-right: 24px;
+            animation: none;
+        }
+
+        @keyframes shimmerSweep {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .slider-handle-knob {
+            position: absolute;
+            left: 4px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent-lime);
+            color: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            box-shadow: 0 4px 14px rgba(212, 255, 0, 0.6);
+            z-index: 5;
+            transition: transform 0.08s ease-out, background-color 0.25s, box-shadow 0.25s;
+        }
+
+        .slider-handle-knob:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+
+        .slider-handle-knob .material-symbols-outlined {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        /* Screen Height Media Queries for Small Screens */
+        @media (max-height: 720px) {
+            .ride-top-bar { margin-top: 42px; }
+            .ride-screen-title { font-size: 19px; }
+            .recenter-fab { width: 36px; height: 36px; }
+            .minimal-search-input-wrap { height: 36px; }
+            .stats-bar-card { padding: 6px 10px; border-radius: 14px; }
+            .stat-main-val { font-size: 14px; }
+            .location-white-card { padding: 6px 12px; gap: 4px; border-radius: 16px; }
+            .loc-icon-bubble { width: 22px; height: 22px; }
+            .loc-name-value { font-size: 11px; }
+            .slide-action-track { height: 44px; }
+            .slider-handle-knob { width: 36px; height: 36px; }
+        }
+
+        @media (max-height: 640px) {
+            .ride-top-bar { margin-top: 38px; }
+            .ride-screen-title { font-size: 17px; }
+            .recenter-fab { width: 34px; height: 34px; }
+            .minimal-search-input-wrap { height: 34px; }
+            .stats-bar-card { padding: 5px 8px; }
+            .stat-main-val { font-size: 13px; }
+            .location-white-card { padding: 5px 10px; }
+            .slide-action-track { height: 40px; }
+            .slider-handle-knob { width: 32px; height: 32px; }
+        }
+
+        /* Navigating Active Mode Track */
+        .slide-action-track.active-nav-mode {
+            background: #1c0a0a;
+            border-color: #ef4444;
+        }
+
+        .slide-action-track.active-nav-mode .slider-handle-knob {
+            background: #ef4444;
+            color: #ffffff;
+            box-shadow: 0 4px 18px rgba(239, 68, 68, 0.7);
+        }
+
+        /* Map Markers & Badges */
+        .route-distance-pill {
+            background: #000000;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 5px 12px;
+            border-radius: var(--radius-pill);
+            border: 1px solid rgba(212, 255, 0, 0.4);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.9);
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+        }
+
+        .start-marker-play {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #ffffff;
+            color: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.8);
+            border: 2px solid #000000;
+        }
+
+        .end-marker-lime {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent-lime);
+            color: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 16px rgba(212, 255, 0, 0.8);
+            border: 3px solid #000000;
+        }
+
+        .rider-pulse-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #38bdf8;
+            border: 3px solid #ffffff;
+            box-shadow: 0 0 14px #38bdf8;
+        }
+
+        /* Arrival Celebration Modal */
+        .arrival-modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .arrival-card {
+            background: var(--bg-card-dark);
+            border: 1px solid var(--accent-lime);
+            border-radius: var(--radius-card);
+            padding: 26px 20px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(212, 255, 0, 0.25);
+        }
+
+        .arrival-icon-bubble {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(212, 255, 0, 0.15);
+            border: 2px solid var(--accent-lime);
+            color: var(--accent-lime);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 14px;
+        }
+
+        .arrival-btn {
+            width: 100%;
+            padding: 13px;
+            background: var(--accent-lime);
+            color: var(--text-dark);
+            border: none;
+            border-radius: var(--radius-pill);
+            font-size: 14px;
+            font-weight: 800;
+            margin-top: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP GLOBAL VIEW SWITCHER TABS (Always visible on Your Ride, straight single line) -->
+    <div class="app-nav-tabs" id="appNavTabs">
+        <button id="tabBtnConnect" class="nav-tab-btn active" onclick="switchView('connect')">
+            <span class="material-symbols-outlined">bolt</span> Mohana
+        </button>
+        <button id="tabBtnRide" class="nav-tab-btn" onclick="switchView('ride')">
+            <span class="material-symbols-outlined">map</span> Your Ride
+        </button>
+    </div>
+
+    <!-- =========================================================================
+         SCREEN 1: MOHANA CONNECTION INTERFACE
+         ========================================================================= -->
+    <div id="connectScreen" class="screen-view active">
+        <div class="connect-container">
+            
+            <!-- Header -->
+            <div class="connect-brand-header">
+                <div class="brand-logo-text">
+                    mohana<span class="brand-reg">®</span>
+                </div>
+                <div id="connectBlePill" class="ble-status-pill" onclick="handleConnectBLE()">
+                    <span class="status-dot-pulse"></span>
+                    <span id="connectBleStatusText">Not Connected</span>
+                </div>
+            </div>
+
+            <!-- Device Hero Card with Handlebar Top-View -->
+            <div class="bike-hero-card">
+                <div class="bike-card-top">
+                    <div>
+                        <div class="bike-title">Mohana</div>
+                        <div class="bike-sub-badge">DUAL HAPTIC NAV</div>
+                    </div>
+                    <div class="bike-arrow-icon" onclick="switchView('ride')">
+                        <span class="material-symbols-outlined">north_east</span>
+                    </div>
+                </div>
+
+                <!-- TOP VIEW OF HANDLEBAR WITH DUAL HAPTIC VIBRATION ACTUATORS -->
+                <div class="handlebar-view-wrap">
+                    <svg class="handlebar-svg" viewBox="0 0 340 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Stem & Center Mount -->
+                        <rect x="156" y="82" width="28" height="42" rx="4" fill="#1b212b" stroke="#334155" stroke-width="2"/>
+                        <circle cx="170" cy="72" r="14" fill="#0f172a" stroke="#d4ff00" stroke-width="2.5"/>
+                        <circle cx="170" cy="72" r="5" fill="#d4ff00"/>
+
+                        <!-- Handlebar Tube (Swept Wings) -->
+                        <path d="M40 38 C 100 46, 140 70, 170 70 C 200 70, 240 46, 300 38" stroke="#334155" stroke-width="14" stroke-linecap="round"/>
+                        <path d="M40 38 C 100 46, 140 70, 170 70 C 200 70, 240 46, 300 38" stroke="#0f172a" stroke-width="8" stroke-linecap="round"/>
+
+                        <!-- Left Grip -->
+                        <rect x="22" y="24" width="46" height="28" rx="6" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+                        <!-- Left Vibration Motor Disc (GPIO 23) -->
+                        <circle cx="45" cy="38" r="16" fill="rgba(212, 255, 0, 0.2)" stroke="#d4ff00" stroke-width="2.5"/>
+                        <circle cx="45" cy="38" r="8" fill="#d4ff00"/>
+                        <path d="M18 26 C12 32, 12 44, 18 50" stroke="#d4ff00" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M12 20 C4 28, 4 48, 12 56" stroke="#d4ff00" stroke-width="1.5" stroke-dasharray="3 3"/>
+                        <text x="45" y="68" fill="#d4ff00" font-size="9" font-weight="800" text-anchor="middle" font-family="Plus Jakarta Sans">LEFT (GPIO 23)</text>
+
+                        <!-- Right Grip -->
+                        <rect x="272" y="24" width="46" height="28" rx="6" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+                        <!-- Right Vibration Motor Disc (GPIO 22) -->
+                        <circle cx="295" cy="38" r="16" fill="rgba(212, 255, 0, 0.2)" stroke="#d4ff00" stroke-width="2.5"/>
+                        <circle cx="295" cy="38" r="8" fill="#d4ff00"/>
+                        <path d="M322 26 C328 32, 328 44, 322 50" stroke="#d4ff00" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M328 20 C336 28, 336 48, 328 56" stroke="#d4ff00" stroke-width="1.5" stroke-dasharray="3 3"/>
+                        <text x="295" y="68" fill="#d4ff00" font-size="9" font-weight="800" text-anchor="middle" font-family="Plus Jakarta Sans">RIGHT (GPIO 22)</text>
+                    </svg>
+                </div>
+
+                <!-- 2x2 HAPTIC TILES GRID (Matching User Reference Image) -->
+                <div class="haptic-tiles-container">
+                    <div class="haptic-tiles-grid">
+                        <div class="haptic-tile">
+                            <div class="haptic-tile-icon">
+                                <span class="material-symbols-outlined">vibration</span>
+                            </div>
+                            <div class="haptic-tile-title">Approaching</div>
+                            <div class="haptic-tile-sub">Single buzz (~60m)</div>
+                        </div>
+
+                        <div class="haptic-tile">
+                            <div class="haptic-tile-icon">
+                                <span class="material-symbols-outlined">notifications_active</span>
+                            </div>
+                            <div class="haptic-tile-title">Turn Imminent</div>
+                            <div class="haptic-tile-sub">Double buzz (~15m)</div>
+                        </div>
+
+                        <div class="haptic-tile">
+                            <div class="haptic-tile-icon">
+                                <span class="material-symbols-outlined">turn_left</span>
+                            </div>
+                            <div class="haptic-tile-title">Left Cue</div>
+                            <div class="haptic-tile-sub">Left Grip (GPIO 23)</div>
+                        </div>
+
+                        <div class="haptic-tile">
+                            <div class="haptic-tile-icon">
+                                <span class="material-symbols-outlined">turn_right</span>
+                            </div>
+                            <div class="haptic-tile-title">Right Cue</div>
+                            <div class="haptic-tile-sub">Right Grip (GPIO 22)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connect Action Button -->
+                <button id="btnConnectMohana" class="btn-connect-action" onclick="handleConnectBLE()">
+                    <div class="lock-icon-circle">
+                        <span class="material-symbols-outlined" id="lockIcon">lock</span>
+                    </div>
+                    <span id="btnConnectText">Connect with Mohana</span>
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                </button>
+            </div>
+
+            <!-- Manual Bench Test Controls -->
+            <div class="bench-test-card">
+                <div class="bench-title">
+                    <span>Haptic Diagnostic Bench</span>
+                    <span style="color: var(--accent-lime)">Hardware Test</span>
+                </div>
+                <div class="test-motor-grid">
+                    <button class="btn-test-cue" onclick="sendBLECommand('L')">
+                        <span class="material-symbols-outlined">turn_left</span>
+                        <span>Left (L)</span>
+                    </button>
+                    <button class="btn-test-cue" onclick="sendBLECommand('R')">
+                        <span class="material-symbols-outlined">turn_right</span>
+                        <span>Right (R)</span>
+                    </button>
+                    <button class="btn-test-cue" onclick="sendBLECommand('U')">
+                        <span class="material-symbols-outlined">u_turn_left</span>
+                        <span>U-Turn (U)</span>
+                    </button>
+                    <button class="btn-test-cue" onclick="sendBLECommand('S')">
+                        <span class="material-symbols-outlined">stop_circle</span>
+                        <span>Stop (S)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rider-First Slogan (Enjoy your ride) -->
+            <div class="feature-card-lime">
+                <h2>mohana®</h2>
+                <p>Feel every turn intuitively through your handlebars. No looking down at your phone, no screen distractions—just keep your eyes on the road and enjoy your ride.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         SCREEN 2: YOUR RIDE DASHBOARD (Pure Black Map)
+         ========================================================================= -->
+    <div id="rideScreen" class="screen-view">
+        
+        <!-- Fullscreen Pure Black Map Canvas -->
+        <div id="map"></div>
+
+        <!-- Top Floating Controls -->
+        <div class="ride-top-overlay">
+            
+            <div class="ride-top-bar">
+                <div class="ride-screen-title">Your Ride</div>
+                <!-- Track & Auto-Center Follow Button -->
+                <div class="recenter-fab active-follow" id="trackFollowBtn" onclick="toggleTrackingFollow()" title="Auto-Center Rider">
+                    <span class="material-symbols-outlined" id="trackFollowIcon">gps_fixed</span>
+                </div>
+            </div>
+
+            <!-- Minimal Search (Prioritizes Nepal) -->
+            <div class="minimal-search-box" id="searchContainer">
+                <div class="minimal-search-input-wrap">
+                    <span class="material-symbols-outlined" style="color: var(--text-muted); margin-right: 6px;">search</span>
+                    <input type="text" id="destSearchInput" class="minimal-search-input" placeholder="Search destination or tap map" autocomplete="off" onfocus="enterSearchFocusMode()" oninput="handleSearchType(this.value)">
+                    <button type="button" class="search-action-btn" onclick="executeSearch()">Find</button>
+                    <button type="button" class="search-cancel-btn" id="searchCancelBtn" onclick="exitSearchFocusMode()">Cancel</button>
+                </div>
+                <div id="minimalSuggestions" class="minimal-suggestions"></div>
+            </div>
+
+        </div>
+
+        <!-- Active Turn Maneuver HUD -->
+        <div class="nav-cue-banner" id="navCueBanner">
+            <div class="cue-icon-wrap">
+                <span class="material-symbols-outlined" id="navCueIcon">navigation</span>
+            </div>
+            <div class="cue-details">
+                <div class="cue-distance-line" id="navCueDist">--<span>m</span></div>
+                <div class="cue-street-name" id="navCueStreet">Proceed along route</div>
+                <div class="cue-haptic-badge" id="navCueHapticBadge">40m - CUE TRANSMITTED</div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls Deck -->
+        <div class="ride-bottom-deck">
+            
+            <!-- 1. Stats Bar: Distance, Next Turn, Haptic Cues (No Duration, No ETA) -->
+            <div class="stats-bar-card">
+                <div class="stat-col">
+                    <span class="stat-heading">Distance</span>
+                    <div class="stat-main-val" id="deckDistanceVal">0.0 km</div>
+                    <span class="stat-sub-unit" id="deckDistSub">Remaining</span>
+                </div>
+                <div class="stat-col">
+                    <span class="stat-heading">Next Turn</span>
+                    <div class="stat-main-val" id="deckNextTurnVal" style="font-size: 13px; font-weight: 800;">Straight</div>
+                    <span class="stat-sub-unit" id="deckNextTurnSub">Ready</span>
+                </div>
+                <div class="stat-col">
+                    <span class="stat-heading">Haptic Cues</span>
+                    <div class="stat-main-val" id="deckCuesCount">0 Cues</div>
+                    <span class="stat-sub-unit" style="color: var(--accent-lime); font-weight: 700;">Dual Motor</span>
+                </div>
+            </div>
+
+            <!-- 2. Location White Card: Current Location & End Point -->
+            <div class="location-white-card" id="locationWhiteCard">
+                <div class="loc-row" onclick="recenterToRider()">
+                    <div class="loc-icon-bubble">
+                        <span class="material-symbols-outlined">near_me</span>
+                    </div>
+                    <div class="loc-text-col">
+                        <div class="loc-type-label">Current Location</div>
+                        <div class="loc-name-value" id="deckOriginAddress">Locating position...</div>
+                    </div>
+                    <span class="material-symbols-outlined loc-chevron">chevron_right</span>
+                </div>
+                
+                <div class="loc-divider"></div>
+
+                <div class="loc-row" onclick="focusDestinationSearch()">
+                    <div class="loc-icon-bubble">
+                        <span class="material-symbols-outlined">location_on</span>
+                    </div>
+                    <div class="loc-text-col">
+                        <div class="loc-type-label">End Point</div>
+                        <div class="loc-name-value" id="deckDestAddress">Tap map or search destination</div>
+                    </div>
+                    <span class="material-symbols-outlined loc-chevron">chevron_right</span>
+                </div>
+            </div>
+
+            <!-- 3. SYMMETRICAL DUAL-DIRECTION SLIDER (Slide L->R to Start, Slide R->L to End) -->
+            <div class="slide-action-track" id="slideTrack">
+                <div class="slider-progress-fill" id="sliderFill"></div>
+                <div class="slider-label-text" id="sliderLabel">
+                    <span id="sliderText">Slide to start ride</span>
+                    <span class="material-symbols-outlined" id="sliderArrowIcon" style="font-size: 18px;">keyboard_double_arrow_right</span>
+                </div>
+                <div class="slider-handle-knob" id="sliderKnob">
+                    <span class="material-symbols-outlined" id="knobIcon">two_wheeler</span>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Arrival Modal -->
+    <div class="arrival-modal-overlay" id="arrivalModal">
+        <div class="arrival-card">
+            <div class="arrival-icon-bubble">
+                <span class="material-symbols-outlined" style="font-size: 36px;">sports_score</span>
+            </div>
+            <h3 style="font-size: 22px; font-weight: 800; color: #ffffff;">Destination Reached</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
+                You have arrived at your destination. Haptic navigation is complete.
+            </p>
+            <button class="arrival-btn" onclick="finishArrival()">Complete Ride</button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // =========================================================================
+        // BLE & HARDWARE SPECIFICATIONS
+        // =========================================================================
+        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        let bleDevice = null;
+        let bleChar = null;
+        let isConnected = false;
+
+        // Default Baseline Position (Kathmandu Valley, Nepal)
+        const DEFAULT_COORDS = { lat: 27.7172, lon: 85.3240, speed: 0, accuracy: 15 };
+
+        // MAP & NAVIGATION STATE
+        let map = null;
+        let riderMarker = null;
+        let startMarker = null;
+        let destinationMarker = null;
+        let routeCasingLayer = null;
+        let routeCoreLayer = null;
+        let routeDistanceBadgeLayer = null;
+
+        let userCoords = { ...DEFAULT_COORDS };
+        let currentRoute = null;
+        let currentDestCoords = null;
+        let offlineroute = [];
+        let activeWaypointIndex = 0;
+        let isNavigating = false;
+        let searchDebounce = null;
+
+        // Follow-Me Auto-Center State
+        let isTrackingFollow = true;
+
+        // Cooldown and Reroute Timers
+        let lastWrongWayAlertTime = 0;
+        let lastRerouteTime = 0;
+        let isOffRoute = false;
+
+        // =========================================================================
+        // AUDIO SYNTHESIZER: RIDE START & END CHIMES (Pure Web Audio API)
+        // =========================================================================
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+
+        function playStartRideSound() {
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+
+                // Energetic ascending melodic electronic chime: C5 (523Hz), E5 (659Hz), G5 (784Hz), C6 (1046Hz)
+                const freqs = [523.25, 659.25, 783.99, 1046.50];
+                freqs.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = i === 3 ? 'sine' : 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.08);
+
+                    gain.gain.setValueAtTime(0, now + i * 0.08);
+                    gain.gain.linearRampToValueAtTime(0.25, now + i * 0.08 + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.32);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now + i * 0.08);
+                    osc.stop(now + i * 0.08 + 0.33);
+                });
+            } catch (e) {
+                console.warn("Start ride sound error:", e);
+            }
+        }
+
+        function playEndRideSound() {
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+
+                // Smooth gentle descending resolution chime: G5 (784Hz) -> E5 (659Hz) -> C5 (523Hz) + warm bass pad
+                const freqs = [783.99, 659.25, 523.25];
+                freqs.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.12);
+
+                    gain.gain.setValueAtTime(0, now + i * 0.12);
+                    gain.gain.linearRampToValueAtTime(0.22, now + i * 0.12 + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.45);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now + i * 0.12);
+                    osc.stop(now + i * 0.12 + 0.46);
+                });
+
+                // Warm resolving sub-pad
+                const pad = ctx.createOscillator();
+                const padGain = ctx.createGain();
+                pad.type = 'triangle';
+                pad.frequency.setValueAtTime(261.63, now + 0.24); // C4
+                padGain.gain.setValueAtTime(0, now + 0.24);
+                padGain.gain.linearRampToValueAtTime(0.18, now + 0.3);
+                padGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+                pad.connect(padGain);
+                padGain.connect(ctx.destination);
+                pad.start(now + 0.24);
+                pad.stop(now + 0.86);
+            } catch (e) {
+                console.warn("End ride sound error:", e);
+            }
+        }
+
+        function playChime(freq1, freq2) {
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq1, now);
+                osc.frequency.exponentialRampToValueAtTime(freq2, now + 0.16);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.22);
+            } catch (e) {
+                console.warn("Audio chime error:", e);
+            }
+        }
+
+        // =========================================================================
+        // VIEW SWITCHER & SCROLL LOGIC
+        // =========================================================================
+        function switchView(viewName) {
+            const connectTab = document.getElementById('tabBtnConnect');
+            const rideTab = document.getElementById('tabBtnRide');
+            const connectScreen = document.getElementById('connectScreen');
+            const rideScreen = document.getElementById('rideScreen');
+            const navTabs = document.getElementById('appNavTabs');
+
+            navTabs.classList.remove('hidden-on-scroll');
+
+            if (viewName === 'connect') {
+                connectTab.classList.add('active');
+                rideTab.classList.remove('active');
+                connectScreen.classList.add('active');
+                rideScreen.classList.remove('active');
+            } else {
+                rideTab.classList.add('active');
+                connectTab.classList.remove('active');
+                rideScreen.classList.add('active');
+                connectScreen.classList.remove('active');
+                if (map) {
+                    setTimeout(() => map.invalidateSize(), 150);
+                }
+            }
+        }
+
+        function initScrollNavBehavior() {
+            const connectScreen = document.getElementById('connectScreen');
+            const navTabs = document.getElementById('appNavTabs');
+            let lastScrollY = 0;
+
+            // Only auto-hide when scrolling down on the Connect screen
+            connectScreen.addEventListener('scroll', () => {
+                const currentScrollY = connectScreen.scrollTop;
+                if (currentScrollY > lastScrollY && currentScrollY > 40) {
+                    navTabs.classList.add('hidden-on-scroll');
+                } else if (currentScrollY < lastScrollY) {
+                    navTabs.classList.remove('hidden-on-scroll');
+                }
+                lastScrollY = currentScrollY;
+            }, { passive: true });
+        }
+
+        // =========================================================================
+        // 1. MAP INITIALIZATION (High-Contrast CartoDB Dark Matter)
+        // =========================================================================
+        function initLeafletMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([userCoords.lat, userCoords.lon], 14);
+
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: ''
+            }).addTo(map);
+
+            const riderIcon = L.divIcon({
+                className: '',
+                html: '<div class="rider-pulse-dot"></div>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+            riderMarker = L.marker([userCoords.lat, userCoords.lon], { icon: riderIcon }).addTo(map);
+
+            // User manual drag unlocks auto-center follow
+            map.on('dragstart', () => {
+                setTrackingFollow(false);
+            });
+
+            map.on('click', e => {
+                exitSearchFocusMode();
+                if (isNavigating) return;
+                const { lat, lng } = e.latlng;
+                selectDestination(lat, lng, `Selected Pin (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+            });
+        }
+
+        // =========================================================================
+        // 2. LIVE LOCATION ENGINE (GPS + IP Geolocation Fallback for HTTP)
+        // =========================================================================
+        async function startGPSTracking() {
+            fetchLiveIPLocation();
+
+            if (!navigator.geolocation) {
+                console.warn("Geolocation API not available in this environment.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                pos => handlePositionUpdate(pos),
+                err => {
+                    console.warn("Direct GPS lock error, relying on live IP position:", err);
+                    fetchLiveIPLocation();
+                },
+                { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+            );
+
+            navigator.geolocation.watchPosition(
+                pos => handlePositionUpdate(pos),
+                err => console.warn("GPS Watcher Warning:", err),
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+            );
+        }
+
+        async function fetchLiveIPLocation() {
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const data = await res.json();
+                if (data && data.latitude && data.longitude) {
+                    const lat = parseFloat(data.latitude);
+                    const lon = parseFloat(data.longitude);
+                    userCoords = { lat, lon, speed: 0, accuracy: 50 };
+                    if (riderMarker) riderMarker.setLatLng([lat, lon]);
+                    if (map && isTrackingFollow) map.panTo([lat, lon], { animate: true });
+                    fetchReverseGeocode(lat, lon, addr => {
+                        document.getElementById('deckOriginAddress').innerText = addr || (data.city ? `${data.city}, Nepal` : "Current Location");
+                    });
+                }
+            } catch (e) {
+                console.warn("IP Geolocation fallback failed:", e);
+            }
+        }
+
+        function handlePositionUpdate(pos) {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            const speed = pos.coords.speed ? (pos.coords.speed * 3.6).toFixed(1) : '0.0';
+            const accuracy = Math.round(pos.coords.accuracy || 0);
+
+            userCoords = { lat, lon, speed: parseFloat(speed), accuracy };
+
+            if (riderMarker) riderMarker.setLatLng([lat, lon]);
+
+            fetchReverseGeocode(lat, lon, addr => {
+                document.getElementById('deckOriginAddress').innerText = addr;
+            });
+
+            // If auto-center tracking is active, keep map centered on rider
+            if (isTrackingFollow && map) {
+                map.panTo([lat, lon], { animate: true, duration: 0.6 });
+            }
+
+            if (isNavigating) {
+                evaluateTurnStep();
+            }
+        }
+
+        // Auto-Center Follow Toggle
+        function toggleTrackingFollow() {
+            setTrackingFollow(!isTrackingFollow);
+            if (isTrackingFollow && userCoords && map) {
+                map.setView([userCoords.lat, userCoords.lon], isNavigating ? 17 : 15, { animate: true });
+            }
+        }
+
+        function setTrackingFollow(enabled) {
+            isTrackingFollow = enabled;
+            const btn = document.getElementById('trackFollowBtn');
+            const icon = document.getElementById('trackFollowIcon');
+            if (enabled) {
+                btn.classList.add('active-follow');
+                icon.innerText = "gps_fixed";
+            } else {
+                btn.classList.remove('active-follow');
+                icon.innerText = "gps_not_fixed";
+            }
+        }
+
+        function recenterToRider() {
+            setTrackingFollow(true);
+            if (userCoords && map) {
+                map.setView([userCoords.lat, userCoords.lon], isNavigating ? 17 : 15, { animate: true });
+            }
+        }
+
+        // =========================================================================
+        // 3. SEARCH & NOMINATIM AUTOCOMPLETE (Prioritizes Nepal)
+        // =========================================================================
+        function handleSearchType(query) {
+            clearTimeout(searchDebounce);
+            const drop = document.getElementById('minimalSuggestions');
+            if (!query || query.trim().length < 3) {
+                drop.style.display = 'none';
+                return;
+            }
+            searchDebounce = setTimeout(() => executeNominatimSearch(query.trim()), 300);
+        }
+
+        async function executeNominatimSearch(query) {
+            try {
+                // Strictly prioritize Nepal with countrycodes=np and Nepal bounding box
+                let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=np&limit=6`;
+                if (userCoords) {
+                    url += `&viewbox=${userCoords.lon - 0.5},${userCoords.lat + 0.5},${userCoords.lon + 0.5},${userCoords.lat - 0.5}`;
+                }
+                let res = await fetch(url);
+                let results = await res.json();
+
+                // If no results inside Nepal, search without country boundary as fallback
+                if (!results || results.length === 0) {
+                    let fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6`;
+                    res = await fetch(fallbackUrl);
+                    results = await res.json();
+                }
+
+                const drop = document.getElementById('minimalSuggestions');
+                drop.innerHTML = '';
+
+                if (!results || results.length === 0) {
+                    drop.style.display = 'none';
+                    return;
+                }
+
+                results.forEach(item => {
+                    const parts = item.display_name.split(',');
+                    const name = parts[0];
+                    const sub = parts.slice(1).join(', ').trim();
+
+                    const row = document.createElement('div');
+                    row.className = 'suggest-row';
+                    row.innerHTML = `
+                        <div class="suggest-name">${name}</div>
+                        <div class="suggest-sub">${sub}</div>
+                    `;
+                    row.onclick = () => {
+                        document.getElementById('destSearchInput').value = name;
+                        drop.style.display = 'none';
+                        selectDestination(parseFloat(item.lat), parseFloat(item.lon), item.display_name);
+                    };
+                    drop.appendChild(row);
+                });
+                drop.style.display = 'block';
+            } catch (e) {
+                console.error("Geocoding error:", e);
+            }
+        }
+
+        function executeSearch() {
+            const val = document.getElementById('destSearchInput').value.trim();
+            if (val) executeNominatimSearch(val);
+        }
+
+        function focusDestinationSearch() {
+            enterSearchFocusMode();
+            document.getElementById('destSearchInput').focus();
+        }
+
+        function enterSearchFocusMode() {
+            document.getElementById('rideScreen').classList.add('search-focused-mode');
+            const navTabs = document.getElementById('appNavTabs');
+            if (navTabs) navTabs.classList.add('search-focused-tabs-hide');
+        }
+
+        function exitSearchFocusMode() {
+            document.getElementById('rideScreen').classList.remove('search-focused-mode');
+            const navTabs = document.getElementById('appNavTabs');
+            if (navTabs) navTabs.classList.remove('search-focused-tabs-hide');
+            const input = document.getElementById('destSearchInput');
+            if (input) input.blur();
+            const drop = document.getElementById('minimalSuggestions');
+            if (drop) drop.style.display = 'none';
+        }
+
+        async function fetchReverseGeocode(lat, lon, callback) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                const data = await res.json();
+                if (data && data.display_name) {
+                    const parts = data.display_name.split(',');
+                    callback(parts[0] + (parts[1] ? `, ${parts[1].trim()}` : ''));
+                } else {
+                    callback(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+                }
+            } catch (e) {
+                callback(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+            }
+        }
+
+        // =========================================================================
+        // 4. BEARING, DISTANCE & GEOMETRIC CALCULATIONS
+        // =========================================================================
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const y = Math.sin(Δλ) * Math.cos(φ2);
+            const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+            const θ = Math.atan2(y, x);
+            return (θ * 180 / Math.PI + 360) % 360;
+        }
+
+        function normalizeAngleDelta(delta) {
+            while (delta > 180) delta -= 360;
+            while (delta < -180) delta += 360;
+            return delta;
+        }
+
+        function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        }
+
+        function distanceToSegmentMeters(px, py, x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            if (dx === 0 && dy === 0) {
+                return haversineDistanceMeters(px, py, x1, y1);
+            }
+            const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+            const projX = x1 + t * dx;
+            const projY = y1 + t * dy;
+            return haversineDistanceMeters(px, py, projX, projY);
+        }
+
+        // =========================================================================
+        // 5. ROUTE CALCULATION & CUE REASONING (Consecutive Path Waypoint Analysis)
+        // =========================================================================
+        async function selectDestination(destLat, destLon, displayName) {
+            exitSearchFocusMode();
+            document.getElementById('minimalSuggestions').style.display = 'none';
+
+            const parts = displayName.split(',');
+            const shortName = parts[0];
+            const fullAddress = parts.slice(1).join(', ').trim() || displayName;
+            currentDestCoords = { lat: destLat, lon: destLon, title: shortName, address: fullAddress };
+
+            document.getElementById('deckDestAddress').innerText = shortName;
+
+            const url = `https://router.project-osrm.org/route/v1/driving/${userCoords.lon},${userCoords.lat};${destLon},${destLat}?steps=true&geometries=geojson&overview=full`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (!data.routes || data.routes.length === 0) {
+                    alert("No route found to that point.");
+                    return;
+                }
+
+                currentRoute = data.routes[0];
+                renderRouteOnMap(currentRoute);
+                parseAndBuildCueWaypoints(currentRoute);
+
+            } catch (e) {
+                console.error("Routing error:", e);
+                alert("Could not load route.");
+            }
+        }
+
+        function renderRouteOnMap(route) {
+            if (routeCasingLayer) map.removeLayer(routeCasingLayer);
+            if (routeCoreLayer) map.removeLayer(routeCoreLayer);
+            if (routeDistanceBadgeLayer) map.removeLayer(routeDistanceBadgeLayer);
+            if (destinationMarker) map.removeLayer(destinationMarker);
+            if (startMarker) map.removeLayer(startMarker);
+
+            const latlngs = route.geometry.coordinates.map(pt => [pt[1], pt[0]]);
+            
+            routeCasingLayer = L.polyline(latlngs, {
+                color: '#000000',
+                weight: 9,
+                opacity: 1.0
+            }).addTo(map);
+
+            routeCoreLayer = L.polyline(latlngs, {
+                color: '#d4ff00',
+                weight: 4.5,
+                opacity: 1.0,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(map);
+
+            const startIcon = L.divIcon({
+                className: '',
+                html: '<div class="start-marker-play"><span class="material-symbols-outlined" style="font-size: 16px; color: #000;">play_arrow</span></div>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            startMarker = L.marker(latlngs[0], { icon: startIcon }).addTo(map);
+
+            const endIcon = L.divIcon({
+                className: '',
+                html: '<div class="end-marker-lime"><span class="material-symbols-outlined" style="font-size: 18px; color: #000;">sports_score</span></div>',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+            destinationMarker = L.marker([currentDestCoords.lat, currentDestCoords.lon], { icon: endIcon }).addTo(map);
+
+            map.fitBounds(routeCoreLayer.getBounds(), { padding: [80, 80] });
+
+            const midIndex = Math.floor(latlngs.length / 2);
+            const midPoint = latlngs[midIndex] || latlngs[0];
+            const totalKm = (route.distance / 1000).toFixed(1);
+
+            const badgeIcon = L.divIcon({
+                className: '',
+                html: `<div class="route-distance-pill">${totalKm} km</div>`,
+                iconSize: [76, 26],
+                iconAnchor: [38, 13]
+            });
+            routeDistanceBadgeLayer = L.marker(midPoint, { icon: badgeIcon }).addTo(map);
+
+            // Update stats bar (Distance, Next Turn, Cues - NO Duration, NO ETA)
+            document.getElementById('deckDistanceVal').innerText = `${totalKm} km`;
+            document.getElementById('deckDistSub').innerText = "Total Trip";
+        }
+
+        // Analyze consecutive route segments and waypoints along the full path
+        function parseAndBuildCueWaypoints(route) {
+            offlineroute = [];
+            const leg = route.legs[0];
+            const steps = leg.steps;
+
+            for (let i = 0; i < steps.length; i++) {
+                const st = steps[i];
+                const mod = (st.maneuver.modifier || '').toLowerCase();
+                const type = (st.maneuver.type || '').toLowerCase();
+                const stepLat = parseFloat(st.maneuver.location[1].toFixed(6));
+                const stepLon = parseFloat(st.maneuver.location[0].toFixed(6));
+
+                let turnCode = null;
+
+                // Compute geometric bearing delta from consecutive path segments
+                if (i < steps.length - 1) {
+                    const nextStep = steps[i + 1];
+                    const bearingIn = st.maneuver.bearing_after !== undefined ? st.maneuver.bearing_after : 0;
+                    const bearingOut = calculateBearing(stepLat, stepLon, nextStep.maneuver.location[1], nextStep.maneuver.location[0]);
+                    const delta = normalizeAngleDelta(bearingOut - bearingIn);
+
+                    if (Math.abs(delta) >= 140 || mod.includes('u-turn') || type.includes('u-turn')) {
+                        turnCode = 'U';
+                    } else if (delta < -25 || mod.includes('left') || type.includes('left')) {
+                        turnCode = 'L';
+                    } else if (delta > 25 || mod.includes('right') || type.includes('right')) {
+                        turnCode = 'R';
+                    }
+                } else if (type.includes('arrive') || i === steps.length - 1) {
+                    turnCode = 'S';
+                }
+
+                if (turnCode) {
+                    const maneuverName = st.name ? 
+                        `${turnCode === 'L' ? 'Left Turn' : (turnCode === 'R' ? 'Right Turn' : (turnCode === 'U' ? 'U-Turn' : 'Destination'))} onto ${st.name}` :
+                        `${st.maneuver.type} ${st.maneuver.modifier || ''}`.trim();
+
+                    offlineroute.push({
+                        lat: stepLat,
+                        lon: stepLon,
+                        turn: turnCode,
+                        name: maneuverName || "Turn along route",
+                        stage: 0 // 0 = unnotified, 1 = >40m notified, 2 = 15-40m notified, 3 = <15m notified
+                    });
+                }
+            }
+
+            // Always ensure final destination stop cue 'S' exists at route endpoint
+            if (offlineroute.length === 0 || offlineroute[offlineroute.length - 1].turn !== 'S') {
+                offlineroute.push({
+                    lat: currentDestCoords.lat,
+                    lon: currentDestCoords.lon,
+                    turn: 'S',
+                    name: 'Arrived at Destination',
+                    stage: 0
+                });
+            }
+
+            localStorage.setItem('offlineroute', JSON.stringify(offlineroute));
+            document.getElementById('deckCuesCount').innerText = `${offlineroute.length} Cues`;
+
+            if (offlineroute.length > 0) {
+                const first = offlineroute[0];
+                document.getElementById('deckNextTurnVal').innerText = first.turn === 'L' ? 'Left Turn' : (first.turn === 'R' ? 'Right Turn' : (first.turn === 'U' ? 'U-Turn' : 'Destination'));
+                document.getElementById('deckNextTurnSub').innerText = 'Ready';
+            }
+        }
+
+        // =========================================================================
+        // 6. SYMMETRICAL SLIDER: L->R TO START, R->L TO END
+        // =========================================================================
+        function initSlideToStart() {
+            const track = document.getElementById('slideTrack');
+            const knob = document.getElementById('sliderKnob');
+            const fill = document.getElementById('sliderFill');
+            const label = document.getElementById('sliderLabel');
+
+            let isDragging = false;
+            let startClientX = 0;
+            let maxSlide = 0;
+
+            function updateMaxSlide() {
+                maxSlide = track.clientWidth - knob.clientWidth - 8;
+            }
+            window.addEventListener('resize', updateMaxSlide);
+            updateMaxSlide();
+
+            function onStart(clientX) {
+                if (!isNavigating && !currentDestCoords) {
+                    alert("Please select a destination by searching or tapping on the map first.");
+                    return;
+                }
+                updateMaxSlide();
+                isDragging = true;
+                startClientX = clientX;
+            }
+
+            function onMove(clientX) {
+                if (!isDragging) return;
+                const diff = clientX - startClientX;
+
+                if (!isNavigating) {
+                    // Forward Start Mode: Left to Right (0 -> maxSlide)
+                    const currentX = Math.max(0, Math.min(diff, maxSlide));
+                    knob.style.transform = `translateX(${currentX}px)`;
+                    const progressPct = (currentX / maxSlide) * 100;
+                    fill.style.width = `${progressPct}%`;
+                    label.style.opacity = `${Math.max(0, 1 - (currentX / maxSlide) * 1.5)}`;
+                } else {
+                    // Ending Mode: Right to Left (maxSlide -> 0)
+                    const currentX = Math.max(0, Math.min(maxSlide + diff, maxSlide));
+                    knob.style.transform = `translateX(${currentX}px)`;
+                    const progressPct = ((maxSlide - currentX) / maxSlide) * 100;
+                    fill.style.width = `${progressPct}%`;
+                    label.style.opacity = `${Math.max(0, 1 - ((maxSlide - currentX) / maxSlide) * 1.5)}`;
+                }
+            }
+
+            function onEnd(clientX) {
+                if (!isDragging) return;
+                isDragging = false;
+                const diff = clientX - startClientX;
+
+                if (!isNavigating) {
+                    const currentX = Math.max(0, Math.min(diff, maxSlide));
+                    if (currentX >= maxSlide * 0.7) {
+                        knob.style.transform = `translateX(${maxSlide}px)`;
+                        fill.style.width = '100%';
+                        label.style.opacity = '0';
+                        setTimeout(() => {
+                            startRideNavigation();
+                        }, 120);
+                    } else {
+                        knob.style.transform = 'translateX(0px)';
+                        fill.style.width = '0%';
+                        label.style.opacity = '1';
+                    }
+                } else {
+                    const currentX = Math.max(0, Math.min(maxSlide + diff, maxSlide));
+                    if (currentX <= maxSlide * 0.3) {
+                        knob.style.transform = 'translateX(0px)';
+                        fill.style.width = '100%';
+                        label.style.opacity = '0';
+                        setTimeout(() => {
+                            stopRideNavigation();
+                        }, 120);
+                    } else {
+                        knob.style.transform = `translateX(${maxSlide}px)`;
+                        fill.style.width = '0%';
+                        label.style.opacity = '1';
+                    }
+                }
+            }
+
+            // Mouse Events
+            knob.addEventListener('mousedown', e => onStart(e.clientX));
+            window.addEventListener('mousemove', e => onMove(e.clientX));
+            window.addEventListener('mouseup', e => onEnd(e.clientX));
+
+            // Touch Events
+            knob.addEventListener('touchstart', e => {
+                if (e.touches.length > 0) onStart(e.touches[0].clientX);
+            }, { passive: true });
+
+            window.addEventListener('touchmove', e => {
+                if (e.touches.length > 0) onMove(e.touches[0].clientX);
+            }, { passive: true });
+
+            window.addEventListener('touchend', e => {
+                const clientX = e.changedTouches.length > 0 ? e.changedTouches[0].clientX : 0;
+                onEnd(clientX);
+            });
+        }
+
+        function startRideNavigation() {
+            isNavigating = true;
+            activeWaypointIndex = 0;
+            isOffRoute = false;
+            document.getElementById('rideScreen').classList.add('navigating-active');
+
+            const track = document.getElementById('slideTrack');
+            const knob = document.getElementById('sliderKnob');
+            const knobIcon = document.getElementById('knobIcon');
+            const sliderText = document.getElementById('sliderText');
+            const sliderArrow = document.getElementById('sliderArrowIcon');
+            const fill = document.getElementById('sliderFill');
+            const label = document.getElementById('sliderLabel');
+
+            track.classList.add('active-nav-mode');
+            knobIcon.innerText = "stop";
+            sliderText.innerText = "Slide to end ride";
+            sliderArrow.innerText = "keyboard_double_arrow_left";
+
+            // Position knob flush on the right edge ready for slide to end
+            const maxSlide = track.clientWidth - knob.clientWidth - 8;
+            knob.style.transform = `translateX(${maxSlide}px)`;
+            fill.style.width = '0%';
+            label.style.opacity = '1';
+
+            document.getElementById('locationWhiteCard').style.display = 'none';
+            document.getElementById('searchContainer').style.display = 'none';
+            document.getElementById('navCueBanner').style.display = 'flex';
+
+            setTrackingFollow(true);
+            map.setZoom(17);
+            if (userCoords) map.panTo([userCoords.lat, userCoords.lon]);
+
+            evaluateTurnStep();
+            playStartRideSound(); // Clean Web Audio start chime
+        }
+
+        function stopRideNavigation() {
+            isNavigating = false;
+            isOffRoute = false;
+            document.getElementById('rideScreen').classList.remove('navigating-active');
+
+            const track = document.getElementById('slideTrack');
+            const knob = document.getElementById('sliderKnob');
+            const knobIcon = document.getElementById('knobIcon');
+            const sliderText = document.getElementById('sliderText');
+            const sliderArrow = document.getElementById('sliderArrowIcon');
+            const fill = document.getElementById('sliderFill');
+            const label = document.getElementById('sliderLabel');
+
+            track.classList.remove('active-nav-mode');
+            knobIcon.innerText = "two_wheeler";
+            sliderText.innerText = "Slide to start ride";
+            sliderArrow.innerText = "keyboard_double_arrow_right";
+            knob.style.transform = 'translateX(0px)';
+            fill.style.width = '0%';
+            label.style.opacity = '1';
+
+            document.getElementById('locationWhiteCard').style.display = 'flex';
+            document.getElementById('searchContainer').style.display = 'block';
+            document.getElementById('navCueBanner').style.display = 'none';
+
+            sendBLECommand('S', 0);
+            playEndRideSound(); // Clean Web Audio end chime
+        }
+
+        // =========================================================================
+        // 7. ACTIVE NAVIGATION: DISTANCE-ESCALATING CUES & OFF-ROUTE RECOVERY
+        // =========================================================================
+        function evaluateTurnStep() {
+            if (!isNavigating || !userCoords) return;
+
+            // 1. Destination arrival check
+            if (currentDestCoords) {
+                const distToFinish = haversineDistanceMeters(userCoords.lat, userCoords.lon, currentDestCoords.lat, currentDestCoords.lon);
+                if (distToFinish <= 18) {
+                    showArrivalCelebration();
+                    return;
+                }
+            }
+
+            // 2. Off-Route & Wrong-Way Detection via Route Segment Cross-Track Distance
+            if (currentRoute && currentRoute.geometry && currentRoute.geometry.coordinates) {
+                const coords = currentRoute.geometry.coordinates;
+                let minCrossTrack = Infinity;
+                let closestSegmentIdx = 0;
+
+                for (let i = 0; i < coords.length - 1; i++) {
+                    const segDist = distanceToSegmentMeters(
+                        userCoords.lat, userCoords.lon,
+                        coords[i][1], coords[i][0],
+                        coords[i+1][1], coords[i+1][0]
+                    );
+                    if (segDist < minCrossTrack) {
+                        minCrossTrack = segDist;
+                        closestSegmentIdx = i;
+                    }
+                }
+
+                // If cross-track distance exceeds 35m, rider has gone off route
+                if (minCrossTrack > 35) {
+                    isOffRoute = true;
+                    const now = Date.now();
+
+                    // Trigger Wrong Way 'W' with 3.5s cooldown lockout
+                    if (now - lastWrongWayAlertTime > 3500) {
+                        lastWrongWayAlertTime = now;
+                        sendBLECommand('W', 0);
+                        playChime(320, 240);
+                    }
+
+                    // Update HUD banner with Off-Route alert
+                    const banner = document.getElementById('navCueBanner');
+                    banner.style.display = 'flex';
+                    banner.classList.add('alert-pulsing');
+                    document.getElementById('navCueIcon').innerText = "warning";
+                    document.getElementById('navCueDist').innerHTML = "OFF<span>ROUTE</span>";
+                    document.getElementById('navCueStreet').innerText = "Wrong Way / Off Planned Route";
+                    const badge = document.getElementById('navCueHapticBadge');
+                    badge.style.display = 'block';
+                    badge.innerText = "ALARM: WRONG WAY (W)";
+
+                    // Connectivity-Aware Rerouting
+                    if (navigator.onLine && now - lastRerouteTime > 7000 && currentDestCoords) {
+                        lastRerouteTime = now;
+                        console.log("[REROUTE] Rider off-route. Online connection detected. Requesting fresh route...");
+                        requestDynamicReroute();
+                    }
+                    return;
+                } else {
+                    // Rider is on route: check for Offline Rejoin / Catch-up
+                    if (isOffRoute) {
+                        isOffRoute = false;
+                        console.log("[REJOIN] Rider rejoined route at segment index:", closestSegmentIdx);
+                        // Offline Catch-up: snap activeWaypointIndex to the next upcoming waypoint ahead along path
+                        for (let k = 0; k < offlineroute.length; k++) {
+                            const wpDist = haversineDistanceMeters(userCoords.lat, userCoords.lon, offlineroute[k].lat, offlineroute[k].lon);
+                            if (wpDist < 60) {
+                                activeWaypointIndex = k;
+                                break;
+                            }
+                        }
+                        const banner = document.getElementById('navCueBanner');
+                        banner.classList.remove('alert-pulsing');
+                        document.getElementById('navCueHapticBadge').style.display = 'none';
+                    }
+                }
+            }
+
+            // 3. Evaluate Active Waypoint Cue & Distance Escalation
+            if (offlineroute.length === 0 || activeWaypointIndex >= offlineroute.length) {
+                document.getElementById('navCueDist').innerHTML = "0<span>m</span>";
+                document.getElementById('navCueStreet').innerText = "Arriving at destination";
+                document.getElementById('navCueIcon').innerText = "sports_score";
+                return;
+            }
+
+            const step = offlineroute[activeWaypointIndex];
+            const dist = haversineDistanceMeters(userCoords.lat, userCoords.lon, step.lat, step.lon);
+
+            document.getElementById('navCueDist').innerHTML = `${Math.round(dist)}<span>m</span>`;
+            document.getElementById('navCueStreet').innerText = step.name;
+
+            const iconEl = document.getElementById('navCueIcon');
+            if (step.turn === 'L') iconEl.innerText = "turn_left";
+            else if (step.turn === 'R') iconEl.innerText = "turn_right";
+            else if (step.turn === 'U') iconEl.innerText = "u_turn_left";
+            else if (step.turn === 'S') iconEl.innerText = "sports_score";
+            else iconEl.innerText = "straight";
+
+            // Update bottom stats card (Next Turn & Remaining Distance)
+            const turnName = step.turn === 'L' ? 'Left Turn' : (step.turn === 'R' ? 'Right Turn' : (step.turn === 'U' ? 'U-Turn' : 'Destination'));
+            document.getElementById('deckNextTurnVal').innerText = turnName;
+            document.getElementById('deckNextTurnSub').innerText = `In ${Math.round(dist)}m`;
+
+            // Distance-Escalating Intensity Cadence:
+            // Stage 1: Far / Approach (>40m, <=60m): ~60% PWM (~155)
+            // Stage 2: Approaching (15m - 40m): ~88% PWM (~225)
+            // Stage 3: Imminent / Turn Now (<15m): 100% PWM (255)
+            const banner = document.getElementById('navCueBanner');
+            const hapticBadge = document.getElementById('navCueHapticBadge');
+
+            if (dist <= 60 && dist > 40 && step.stage < 1) {
+                step.stage = 1;
+                banner.classList.add('alert-pulsing');
+                hapticBadge.style.display = 'block';
+                hapticBadge.innerText = `${Math.round(dist)}m - ${turnName.toUpperCase()} (~60% PWM)`;
+                sendBLECommand(step.turn, Math.round(dist));
+                playChime(480, 640);
+                setTimeout(() => { banner.classList.remove('alert-pulsing'); }, 2000);
+            } else if (dist <= 40 && dist > 15 && step.stage < 2) {
+                step.stage = 2;
+                banner.classList.add('alert-pulsing');
+                hapticBadge.style.display = 'block';
+                hapticBadge.innerText = `${Math.round(dist)}m - ${turnName.toUpperCase()} (~88% PWM)`;
+                sendBLECommand(step.turn, Math.round(dist));
+                playChime(640, 820);
+                setTimeout(() => { banner.classList.remove('alert-pulsing'); }, 2000);
+            } else if (dist <= 15 && step.stage < 3) {
+                step.stage = 3;
+                banner.classList.add('alert-pulsing');
+                hapticBadge.style.display = 'block';
+                hapticBadge.innerText = `${Math.round(dist)}m - TURN NOW (100% PWM)`;
+                sendBLECommand(step.turn, Math.round(dist));
+                playChime(820, 1040);
+            }
+
+            // Advance waypoint when rider reaches junction
+            if (dist <= 10) {
+                activeWaypointIndex++;
+                evaluateTurnStep();
+            }
+
+            // Update remaining distance in stats deck
+            if (currentRoute && currentRoute.geometry && currentRoute.geometry.coordinates) {
+                const coords = currentRoute.geometry.coordinates;
+                let minD = Infinity;
+                let closestI = 0;
+                for (let i = 0; i < coords.length; i++) {
+                    const d = haversineDistanceMeters(userCoords.lat, userCoords.lon, coords[i][1], coords[i][0]);
+                    if (d < minD) { minD = d; closestI = i; }
+                }
+                let remMeters = minD;
+                for (let i = closestI; i < coords.length - 1; i++) {
+                    remMeters += haversineDistanceMeters(coords[i][1], coords[i][0], coords[i+1][1], coords[i+1][0]);
+                }
+                const remKm = (remMeters / 1000).toFixed(1);
+                document.getElementById('deckDistanceVal').innerText = `${remKm} km`;
+                document.getElementById('deckDistSub').innerText = "Remaining";
+
+                if (routeDistanceBadgeLayer) {
+                    routeDistanceBadgeLayer.setIcon(L.divIcon({
+                        className: '',
+                        html: `<div class="route-distance-pill">${remKm} km rem.</div>`,
+                        iconSize: [84, 26],
+                        iconAnchor: [42, 13]
+                    }));
+                }
+            }
+        }
+
+        async function requestDynamicReroute() {
+            if (!currentDestCoords || !userCoords) return;
+            const url = `https://router.project-osrm.org/route/v1/driving/${userCoords.lon},${userCoords.lat};${currentDestCoords.lon},${currentDestCoords.lat}?steps=true&geometries=geojson&overview=full`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.routes && data.routes.length > 0) {
+                    currentRoute = data.routes[0];
+                    renderRouteOnMap(currentRoute);
+                    parseAndBuildCueWaypoints(currentRoute);
+                    activeWaypointIndex = 0;
+                    isOffRoute = false;
+                    document.getElementById('navCueBanner').classList.remove('alert-pulsing');
+                    console.log("[REROUTE SUCCESS] Fresh path loaded to destination.");
+                }
+            } catch (err) {
+                console.warn("[REROUTE ERROR] Offline or network error. Retaining pre-loaded route.", err);
+            }
+        }
+
+        function showArrivalCelebration() {
+            stopRideNavigation();
+            sendBLECommand('S', 0);
+            playEndRideSound();
+            document.getElementById('arrivalModal').style.display = 'flex';
+        }
+
+        function finishArrival() {
+            document.getElementById('arrivalModal').style.display = 'none';
+        }
+
+        // =========================================================================
+        // 8. WEB BLUETOOTH INTEGRATION (Distance-Escalating BLE TX)
+        // =========================================================================
+        async function handleConnectBLE() {
+            const pill = document.getElementById('connectBlePill');
+            const text = document.getElementById('connectBleStatusText');
+            const btn = document.getElementById('btnConnectMohana');
+            const btnText = document.getElementById('btnConnectText');
+            const lockIcon = document.getElementById('lockIcon');
+
+            if (isConnected) {
+                if (bleDevice && bleDevice.gatt.connected) {
+                    bleDevice.gatt.disconnect();
+                }
+                isConnected = false;
+                pill.className = "ble-status-pill";
+                text.innerText = "Not Connected";
+                btn.className = "btn-connect-action";
+                btnText.innerText = "Connect with Mohana";
+                lockIcon.innerText = "lock";
+                return;
+            }
+
+            try {
+                pill.className = "ble-status-pill connecting";
+                text.innerText = "Searching ESP32...";
+                btnText.innerText = "Connecting...";
+
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'MotoHapticNav' }, { namePrefix: 'Moto' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                bleDevice.addEventListener('gattserverdisconnected', () => {
+                    isConnected = false;
+                    pill.className = "ble-status-pill";
+                    text.innerText = "Disconnected";
+                    btn.className = "btn-connect-action";
+                    btnText.innerText = "Connect with Mohana";
+                    lockIcon.innerText = "lock";
+                });
+
+                const server = await bleDevice.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                const chars = await service.getCharacteristics();
+
+                bleChar = chars.find(c => c.uuid.includes("26ae") || c.uuid.includes("26a9")) || chars[0];
+
+                isConnected = true;
+                pill.className = "ble-status-pill connected";
+                text.innerText = "Connected";
+                btn.className = "btn-connect-action connected";
+                btnText.innerText = "Connected to Mohana";
+                lockIcon.innerText = "lock_open";
+                playStartRideSound();
+
+                setTimeout(() => {
+                    switchView('ride');
+                }, 600);
+
+            } catch (err) {
+                console.error("BLE Connect failed:", err);
+                pill.className = "ble-status-pill";
+                text.innerText = "Not Connected";
+                btn.className = "btn-connect-action";
+                btnText.innerText = "Connect with Mohana";
+                lockIcon.innerText = "lock";
+            }
+        }
+
+        async function sendBLECommand(cmd, dist = -1) {
+            const payloadStr = dist >= 0 ? `${cmd}:${dist}` : `${cmd}`;
+            if (!bleChar) {
+                console.log(`[SIMULATION] Motor Cue: '${payloadStr}'`);
+                return;
+            }
+            try {
+                const encoder = new TextEncoder();
+                const payload = encoder.encode(payloadStr);
+                if (bleChar.writeValueWithoutResponse) {
+                    await bleChar.writeValueWithoutResponse(payload);
+                } else {
+                    await bleChar.writeValue(payload);
+                }
+                console.log(`[BLE TX] Sent: ${payloadStr}`);
+            } catch (e) {
+                console.error("BLE Write error:", e);
+            }
+        }
+
+        // Dynamic Viewport Height Calculator for Mobile Address Bars (Safari, Chrome, Brave)
+        function updateViewportHeight() {
+            const vh = window.innerHeight;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        window.addEventListener('resize', updateViewportHeight);
+        window.addEventListener('orientationchange', updateViewportHeight);
+        updateViewportHeight();
+
+        // =========================================================================
+        // INIT ON WINDOW LOAD
+        // =========================================================================
+        window.addEventListener('load', () => {
+            updateViewportHeight();
+            initLeafletMap();
+            startGPSTracking();
+            initSlideToStart();
+            initScrollNavBehavior();
+
+            try {
+                const saved = localStorage.getItem('offlineroute');
+                if (saved) offlineroute = JSON.parse(saved);
+            } catch (e) {}
+        });
+    </script>
+</body>
+</html>
