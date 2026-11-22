@@ -508,7 +508,7 @@
         }
 
         .leaflet-tile-pane {
-            filter: invert(100%) hue-rotate(180deg) brightness(78%) contrast(145%) grayscale(100%);
+            filter: brightness(115%) contrast(110%);
         }
         .leaflet-container {
             background: #000000 !important;
@@ -626,6 +626,70 @@
             font-size: 12px;
             font-weight: 800;
             cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .search-cancel-btn {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-pill);
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-left: 6px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .search-cancel-btn:active {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Search Focus Mode (Hides surrounding HUD elements so keyboard doesn't obstruct search) */
+        #rideScreen.search-focused-mode .ride-top-bar {
+            display: none !important;
+        }
+
+        #rideScreen.search-focused-mode .ride-bottom-deck {
+            display: none !important;
+        }
+
+        #rideScreen.search-focused-mode .search-cancel-btn {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #rideScreen.search-focused-mode .minimal-suggestions {
+            max-height: 52vh;
+            z-index: 1500;
+        }
+
+        .search-focused-tabs-hide {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Active Navigation Mode (Separates Top Turn Banner and Recenter FAB) */
+        #rideScreen.navigating-active .ride-top-bar {
+            margin-top: 0;
+            position: static;
+            pointer-events: none;
+        }
+
+        #rideScreen.navigating-active .ride-screen-title {
+            display: none !important;
+        }
+
+        #rideScreen.navigating-active #trackFollowBtn {
+            position: absolute;
+            top: calc(max(10px, env(safe-area-inset-top)) + 140px);
+            right: 16px;
+            z-index: 1200;
+            pointer-events: auto;
         }
 
         .minimal-suggestions {
@@ -1335,8 +1399,9 @@
             <div class="minimal-search-box" id="searchContainer">
                 <div class="minimal-search-input-wrap">
                     <span class="material-symbols-outlined" style="color: var(--text-muted); margin-right: 6px;">search</span>
-                    <input type="text" id="destSearchInput" class="minimal-search-input" placeholder="Search Nepal destination or tap map..." autocomplete="off" oninput="handleSearchType(this.value)">
-                    <button class="search-action-btn" onclick="executeSearch()">Find</button>
+                    <input type="text" id="destSearchInput" class="minimal-search-input" placeholder="Search destination or tap map" autocomplete="off" onfocus="enterSearchFocusMode()" oninput="handleSearchType(this.value)">
+                    <button type="button" class="search-action-btn" onclick="executeSearch()">Find</button>
+                    <button type="button" class="search-cancel-btn" id="searchCancelBtn" onclick="exitSearchFocusMode()">Cancel</button>
                 </div>
                 <div id="minimalSuggestions" class="minimal-suggestions"></div>
             </div>
@@ -1620,7 +1685,7 @@
         }
 
         // =========================================================================
-        // 1. MAP INITIALIZATION (Pure Pitch-Black OpenStreetMap)
+        // 1. MAP INITIALIZATION (High-Contrast CartoDB Dark Matter)
         // =========================================================================
         function initLeafletMap() {
             map = L.map('map', {
@@ -1628,7 +1693,8 @@
                 attributionControl: false
             }).setView([userCoords.lat, userCoords.lon], 14);
 
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd',
                 maxZoom: 19,
                 attribution: ''
             }).addTo(map);
@@ -1647,6 +1713,7 @@
             });
 
             map.on('click', e => {
+                exitSearchFocusMode();
                 if (isNavigating) return;
                 const { lat, lng } = e.latlng;
                 selectDestination(lat, lng, `Selected Pin (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
@@ -1819,7 +1886,24 @@
         }
 
         function focusDestinationSearch() {
+            enterSearchFocusMode();
             document.getElementById('destSearchInput').focus();
+        }
+
+        function enterSearchFocusMode() {
+            document.getElementById('rideScreen').classList.add('search-focused-mode');
+            const navTabs = document.getElementById('appNavTabs');
+            if (navTabs) navTabs.classList.add('search-focused-tabs-hide');
+        }
+
+        function exitSearchFocusMode() {
+            document.getElementById('rideScreen').classList.remove('search-focused-mode');
+            const navTabs = document.getElementById('appNavTabs');
+            if (navTabs) navTabs.classList.remove('search-focused-tabs-hide');
+            const input = document.getElementById('destSearchInput');
+            if (input) input.blur();
+            const drop = document.getElementById('minimalSuggestions');
+            if (drop) drop.style.display = 'none';
         }
 
         async function fetchReverseGeocode(lat, lon, callback) {
@@ -1884,6 +1968,7 @@
         // 5. ROUTE CALCULATION & CUE REASONING (Consecutive Path Waypoint Analysis)
         // =========================================================================
         async function selectDestination(destLat, destLon, displayName) {
+            exitSearchFocusMode();
             document.getElementById('minimalSuggestions').style.display = 'none';
 
             const parts = displayName.split(',');
@@ -2151,6 +2236,7 @@
             isNavigating = true;
             activeWaypointIndex = 0;
             isOffRoute = false;
+            document.getElementById('rideScreen').classList.add('navigating-active');
 
             const track = document.getElementById('slideTrack');
             const knob = document.getElementById('sliderKnob');
@@ -2186,6 +2272,7 @@
         function stopRideNavigation() {
             isNavigating = false;
             isOffRoute = false;
+            document.getElementById('rideScreen').classList.remove('navigating-active');
 
             const track = document.getElementById('slideTrack');
             const knob = document.getElementById('sliderKnob');
