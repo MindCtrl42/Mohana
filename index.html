@@ -1160,13 +1160,63 @@
             border: 3px solid #000000;
         }
 
+        /* Rider Location & Directional Heading Cone */
+        .rider-marker-wrapper {
+            position: relative;
+            width: 52px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .rider-heading-cone {
+            position: absolute;
+            width: 52px;
+            height: 52px;
+            top: 0;
+            left: 0;
+            transform-origin: 26px 26px;
+            transition: transform 0.1s linear;
+            pointer-events: none;
+        }
+
+        .rider-heading-beam {
+            position: absolute;
+            top: 1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 14px solid transparent;
+            border-right: 14px solid transparent;
+            border-bottom: 26px solid rgba(56, 189, 248, 0.45);
+            filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8));
+        }
+
+        .rider-heading-beam::after {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: -5px;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 9px solid #ffffff;
+            filter: drop-shadow(0 0 4px #38bdf8);
+        }
+
         .rider-pulse-dot {
+            position: relative;
             width: 18px;
             height: 18px;
             border-radius: 50%;
             background: #38bdf8;
             border: 3px solid #ffffff;
-            box-shadow: 0 0 14px #38bdf8;
+            box-shadow: 0 0 16px #38bdf8, 0 2px 8px rgba(0, 0, 0, 0.9);
+            z-index: 2;
         }
 
         /* Arrival Celebration Modal */
@@ -1534,6 +1584,18 @@
         // Follow-Me Auto-Center State
         let isTrackingFollow = true;
 
+        // Rider Orientation & Heading State
+        let riderHeading = 0;             // Real-time compass / course heading (0-360°)
+        let hasHeadingFix = false;
+        let lastGpsCoords = null;
+        let headingSmoothingFactor = 0.35; // Low-pass filter for smooth cone rotation
+
+        // Ride-Start Stabilization & Anti-Confusion State
+        let rideStartTime = 0;
+        let rideStartCoords = null;
+        let hasDepartedStart = false;
+        let isStartStabilized = false;
+
         // Cooldown and Reroute Timers
         let lastWrongWayAlertTime = 0;
         let lastRerouteTime = 0;
@@ -1700,9 +1762,16 @@
 
             const riderIcon = L.divIcon({
                 className: '',
-                html: '<div class="rider-pulse-dot"></div>',
-                iconSize: [18, 18],
-                iconAnchor: [9, 9]
+                html: `
+                    <div class="rider-marker-wrapper">
+                        <div class="rider-heading-cone" id="riderHeadingCone" style="transform: rotate(${Math.round(riderHeading)}deg);">
+                            <div class="rider-heading-beam"></div>
+                        </div>
+                        <div class="rider-pulse-dot"></div>
+                    </div>
+                `,
+                iconSize: [52, 52],
+                iconAnchor: [26, 26]
             });
             riderMarker = L.marker([userCoords.lat, userCoords.lon], { icon: riderIcon }).addTo(map);
 
@@ -1775,6 +1844,20 @@
 
             if (riderMarker) riderMarker.setLatLng([lat, lon]);
 
+            // GPS Course Heading when moving
+            if (pos.coords.heading !== null && !isNaN(pos.coords.heading) && pos.coords.heading >= 0) {
+                if (pos.coords.speed && pos.coords.speed > 1.4) { // > ~5 km/h
+                    updateRiderHeading(pos.coords.heading);
+                }
+            } else if (lastGpsCoords && userCoords.speed > 3) {
+                const motionBearing = calculateBearing(lastGpsCoords.lat, lastGpsCoords.lon, lat, lon);
+                const distMoved = haversineDistanceMeters(lastGpsCoords.lat, lastGpsCoords.lon, lat, lon);
+                if (distMoved >= 3) {
+                    updateRiderHeading(motionBearing);
+                }
+            }
+            lastGpsCoords = { lat, lon };
+
             fetchReverseGeocode(lat, lon, addr => {
                 document.getElementById('deckOriginAddress').innerText = addr;
             });
@@ -1787,6 +1870,77 @@
             if (isNavigating) {
                 evaluateTurnStep();
             }
+        }
+
+        // =========================================================================
+        // COMPASS & DEVICE ORIENTATION TRACKING (Stationary & Moving Cone)
+        // =========================================================================
+        function initOrientationTracking() {
+            if ('ondeviceorientationabsolute' in window) {
+                window.addEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
+            } else if ('ondeviceorientation' in window) {
+                window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+            }
+
+            // iOS 13+ permission trigger on first user touch/click
+            const requestCompass = () => {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(response => {
+                            if (response === 'granted') {
+                                window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+                            }
+                        })
+                        .catch(err => console.warn("Orientation permission:", err));
+                }
+                window.removeEventListener('click', requestCompass);
+                window.removeEventListener('touchstart', requestCompass);
+            };
+            window.addEventListener('click', requestCompass, { passive: true });
+            window.addEventListener('touchstart', requestCompass, { passive: true });
+        }
+
+        function handleDeviceOrientation(e) {
+            let heading = null;
+            if (typeof e.webkitCompassHeading !== 'undefined' && e.webkitCompassHeading !== null) {
+                heading = e.webkitCompassHeading;
+            } else if (e.alpha !== null && !isNaN(e.alpha)) {
+                heading = (360 - e.alpha) % 360;
+            }
+
+            if (heading !== null && !isNaN(heading)) {
+                // When moving fast (> 7 km/h), GPS course provides ground truth; when stationary/slow, compass is king!
+                if (!userCoords || !userCoords.speed || userCoords.speed < 7) {
+                    updateRiderHeading(heading);
+                }
+            }
+        }
+
+        function updateRiderHeading(newHeading) {
+            if (newHeading === null || isNaN(newHeading)) return;
+            hasHeadingFix = true;
+
+            // Shortest angular difference for seamless rotation wrapping across 0/360°
+            const delta = normalizeAngleDelta(newHeading - riderHeading);
+            riderHeading = (riderHeading + delta * headingSmoothingFactor + 360) % 360;
+
+            const cone = document.getElementById('riderHeadingCone');
+            if (cone) {
+                cone.style.transform = `rotate(${Math.round(riderHeading)}deg)`;
+            }
+
+            // Re-evaluate visual turn cues if rider rotates device while stationary at an intersection
+            if (isNavigating && (!userCoords.speed || userCoords.speed < 4)) {
+                evaluateTurnStep(true); // true = visual HUD update only, no redundant haptics
+            }
+        }
+
+        function computeRelativeTurn(targetBearing, currentHeading) {
+            const relDelta = normalizeAngleDelta(targetBearing - currentHeading);
+            if (Math.abs(relDelta) >= 140) return { code: 'U', delta: relDelta };
+            if (relDelta < -22) return { code: 'L', delta: relDelta };
+            if (relDelta > 22) return { code: 'R', delta: relDelta };
+            return { code: 'STRAIGHT', delta: relDelta };
         }
 
         // Auto-Center Follow Toggle
@@ -2094,12 +2248,17 @@
                         `${turnCode === 'L' ? 'Left Turn' : (turnCode === 'R' ? 'Right Turn' : (turnCode === 'U' ? 'U-Turn' : 'Destination'))} onto ${st.name}` :
                         `${st.maneuver.type} ${st.maneuver.modifier || ''}`.trim();
 
+                    const targetBearing = st.maneuver.bearing_after !== undefined ? 
+                        st.maneuver.bearing_after : 
+                        (i < steps.length - 1 ? calculateBearing(stepLat, stepLon, steps[i+1].maneuver.location[1], steps[i+1].maneuver.location[0]) : 0);
+
                     offlineroute.push({
                         lat: stepLat,
                         lon: stepLon,
                         turn: turnCode,
+                        targetBearing: targetBearing,
                         name: maneuverName || "Turn along route",
-                        stage: 0 // 0 = unnotified, 1 = >40m notified, 2 = 15-40m notified, 3 = <15m notified
+                        stage: 0 // 0 = unnotified, 1 = approach notified, 2 = imminent turn now notified
                     });
                 }
             }
@@ -2235,6 +2394,10 @@
             isNavigating = true;
             activeWaypointIndex = 0;
             isOffRoute = false;
+            rideStartTime = Date.now();
+            rideStartCoords = { lat: userCoords.lat, lon: userCoords.lon };
+            hasDepartedStart = false;
+            isStartStabilized = false;
             document.getElementById('rideScreen').classList.add('navigating-active');
 
             const track = document.getElementById('slideTrack');
@@ -2271,6 +2434,10 @@
         function stopRideNavigation() {
             isNavigating = false;
             isOffRoute = false;
+            rideStartTime = 0;
+            rideStartCoords = null;
+            hasDepartedStart = false;
+            isStartStabilized = false;
             document.getElementById('rideScreen').classList.remove('navigating-active');
 
             const track = document.getElementById('slideTrack');
@@ -2300,7 +2467,7 @@
         // =========================================================================
         // 7. ACTIVE NAVIGATION: DISTANCE-ESCALATING CUES & OFF-ROUTE RECOVERY
         // =========================================================================
-        function evaluateTurnStep() {
+        function evaluateTurnStep(isVisualOnly = false) {
             if (!isNavigating || !userCoords) return;
 
             // 1. Destination arrival check
@@ -2312,8 +2479,21 @@
                 }
             }
 
-            // 2. Off-Route & Wrong-Way Detection via Route Segment Cross-Track Distance
-            if (currentRoute && currentRoute.geometry && currentRoute.geometry.coordinates) {
+            // 2. Ride-Start Stabilization & Anti-Confusion Gate
+            const timeSinceStart = rideStartTime ? (Date.now() - rideStartTime) : 99999;
+            const distFromStart = rideStartCoords ? haversineDistanceMeters(userCoords.lat, userCoords.lon, rideStartCoords.lat, rideStartCoords.lon) : 999;
+
+            if (!hasDepartedStart) {
+                // Require moving at least 8 meters OR speed > 2.5 km/h OR 5s elapsed
+                if (distFromStart >= 8 || (userCoords.speed && userCoords.speed > 2.5) || timeSinceStart > 5000) {
+                    hasDepartedStart = true;
+                    isStartStabilized = true;
+                }
+            }
+
+            // 3. Off-Route & Wrong-Way Detection via Route Segment Cross-Track Distance
+            // Lock out Wrong-Way alerts during initial stabilization window (first 5s or stationary at curb)
+            if (hasDepartedStart && timeSinceStart > 5000 && currentRoute && currentRoute.geometry && currentRoute.geometry.coordinates) {
                 const coords = currentRoute.geometry.coordinates;
                 let minCrossTrack = Infinity;
                 let closestSegmentIdx = 0;
@@ -2380,7 +2560,7 @@
                 }
             }
 
-            // 3. Evaluate Active Waypoint Cue & Distance Escalation
+            // 4. Evaluate Active Waypoint Cue & Heading-Aware Direction
             if (offlineroute.length === 0 || activeWaypointIndex >= offlineroute.length) {
                 document.getElementById('navCueDist').innerHTML = "0<span>m</span>";
                 document.getElementById('navCueStreet').innerText = "Arriving at destination";
@@ -2391,55 +2571,111 @@
             const step = offlineroute[activeWaypointIndex];
             const dist = haversineDistanceMeters(userCoords.lat, userCoords.lon, step.lat, step.lon);
 
+            // Heading-Aware Relative Turn Evaluation:
+            // Compare the road's target outgoing bearing with the rider's actual facing orientation
+            let effectiveTurn = step.turn;
+            if (step.turn !== 'S') {
+                if (activeWaypointIndex === 0 && dist > 15) {
+                    // Initial departure from start point: evaluate departure bearing relative to rider facing
+                    const depBearing = calculateBearing(userCoords.lat, userCoords.lon, step.lat, step.lon);
+                    const rel = computeRelativeTurn(depBearing, riderHeading);
+                    if (rel.code !== 'STRAIGHT') effectiveTurn = rel.code;
+                } else if (hasHeadingFix && step.targetBearing !== undefined) {
+                    const rel = computeRelativeTurn(step.targetBearing, riderHeading);
+                    if (rel.code !== 'STRAIGHT') effectiveTurn = rel.code;
+                }
+            }
+
             document.getElementById('navCueDist').innerHTML = `${Math.round(dist)}<span>m</span>`;
             document.getElementById('navCueStreet').innerText = step.name;
 
             const iconEl = document.getElementById('navCueIcon');
-            if (step.turn === 'L') iconEl.innerText = "turn_left";
-            else if (step.turn === 'R') iconEl.innerText = "turn_right";
-            else if (step.turn === 'U') iconEl.innerText = "u_turn_left";
-            else if (step.turn === 'S') iconEl.innerText = "sports_score";
+            if (effectiveTurn === 'L') iconEl.innerText = "turn_left";
+            else if (effectiveTurn === 'R') iconEl.innerText = "turn_right";
+            else if (effectiveTurn === 'U') iconEl.innerText = "u_turn_left";
+            else if (effectiveTurn === 'S') iconEl.innerText = "sports_score";
             else iconEl.innerText = "straight";
 
             // Update bottom stats card (Next Turn & Remaining Distance)
-            const turnName = step.turn === 'L' ? 'Left Turn' : (step.turn === 'R' ? 'Right Turn' : (step.turn === 'U' ? 'U-Turn' : 'Destination'));
+            const turnName = effectiveTurn === 'L' ? 'Left Turn' : (effectiveTurn === 'R' ? 'Right Turn' : (effectiveTurn === 'U' ? 'U-Turn' : 'Destination'));
             document.getElementById('deckNextTurnVal').innerText = turnName;
             document.getElementById('deckNextTurnSub').innerText = `In ${Math.round(dist)}m`;
 
-            // Distance-Escalating Intensity Cadence:
-            // Stage 1: Far / Approach (>40m, <=60m): ~60% PWM (~155)
-            // Stage 2: Approaching (15m - 40m): ~88% PWM (~225)
-            // Stage 3: Imminent / Turn Now (<15m): 100% PWM (255)
+            // If stationary at ride start (standing at curb or intersection), display visual cue
+            // but suppress sudden motor buzzes until bike actually moves
+            if (!hasDepartedStart) {
+                document.getElementById('navCueStreet').innerText = `Depart: ${step.name}`;
+                return;
+            }
+
+            if (isVisualOnly) return; // Orientation update triggered visual refresh only
+
+            // 5. Anti-False-Turn Timing & Speed-Scaled Distance Thresholds
+            const speedKmh = userCoords.speed || 0;
+            // Adaptive thresholds:
+            // Slow/City (< 20 km/h): Approach at 22-26m, Turn Now at 8-11m
+            // Fast (> 35 km/h): Approach at 28-32m, Turn Now at 12-14m
+            let approachThreshold = Math.min(32, Math.max(20, Math.round(speedKmh * 0.45 + 18)));
+            let imminentThreshold = Math.min(13, Math.max(7, Math.round(speedKmh * 0.2 + 7)));
+
+            // Anti-False-Turn: Suppress early cue if an intermediate side-street / junction is nearby
+            let suppressEarlyCue = false;
+            if (activeWaypointIndex > 0) {
+                const prevWp = offlineroute[activeWaypointIndex - 1];
+                const junctionSpacing = haversineDistanceMeters(prevWp.lat, prevWp.lon, step.lat, step.lon);
+                const distToPrev = haversineDistanceMeters(userCoords.lat, userCoords.lon, prevWp.lat, prevWp.lon);
+
+                // If the rider is still passing the previous intersection (within 10m), suppress next cue
+                if (distToPrev < 10) {
+                    suppressEarlyCue = true;
+                }
+
+                // If target turn is closely preceded by another side junction (< 45m spacing),
+                // clamp approach threshold so the cue NEVER fires until past the earlier side street!
+                if (junctionSpacing < 45) {
+                    approachThreshold = Math.min(approachThreshold, Math.max(12, Math.round(junctionSpacing * 0.65)));
+                }
+            }
+
+            // Intermediate route nodes check (clamp approach threshold if intermediate bend exists within 28m)
+            if (currentRoute && currentRoute.geometry && currentRoute.geometry.coordinates) {
+                const coords = currentRoute.geometry.coordinates;
+                for (let i = 0; i < coords.length - 1; i++) {
+                    const nodeDist = haversineDistanceMeters(userCoords.lat, userCoords.lon, coords[i][1], coords[i][0]);
+                    const nodeToStep = haversineDistanceMeters(coords[i][1], coords[i][0], step.lat, step.lon);
+                    if (nodeDist > 5 && nodeDist < dist - 8 && nodeToStep < 28) {
+                        approachThreshold = Math.min(approachThreshold, 20);
+                        break;
+                    }
+                }
+            }
+
+            // 6. Distance-Escalating Intensity Cadence (Tightened to Actual Target Turn)
             const banner = document.getElementById('navCueBanner');
             const hapticBadge = document.getElementById('navCueHapticBadge');
 
-            if (dist <= 60 && dist > 40 && step.stage < 1) {
+            // Stage 1: Approaching Target Turn (20m - 32m, past earlier side streets)
+            if (dist <= approachThreshold && dist > imminentThreshold && step.stage < 1 && !suppressEarlyCue) {
                 step.stage = 1;
                 banner.classList.add('alert-pulsing');
                 hapticBadge.style.display = 'block';
-                hapticBadge.innerText = `${Math.round(dist)}m - ${turnName.toUpperCase()} (~60% PWM)`;
-                sendBLECommand(step.turn, Math.round(dist));
-                playChime(480, 640);
+                hapticBadge.innerText = `${Math.round(dist)}m - ${turnName.toUpperCase()} (~85% PWM)`;
+                sendBLECommand(effectiveTurn, Math.round(dist));
+                playChime(640, 820);
                 setTimeout(() => { banner.classList.remove('alert-pulsing'); }, 2000);
-            } else if (dist <= 40 && dist > 15 && step.stage < 2) {
+            }
+            // Stage 2: Imminent / Turn Now (< 13m)
+            else if (dist <= imminentThreshold && step.stage < 2) {
                 step.stage = 2;
                 banner.classList.add('alert-pulsing');
                 hapticBadge.style.display = 'block';
-                hapticBadge.innerText = `${Math.round(dist)}m - ${turnName.toUpperCase()} (~88% PWM)`;
-                sendBLECommand(step.turn, Math.round(dist));
-                playChime(640, 820);
-                setTimeout(() => { banner.classList.remove('alert-pulsing'); }, 2000);
-            } else if (dist <= 15 && step.stage < 3) {
-                step.stage = 3;
-                banner.classList.add('alert-pulsing');
-                hapticBadge.style.display = 'block';
                 hapticBadge.innerText = `${Math.round(dist)}m - TURN NOW (100% PWM)`;
-                sendBLECommand(step.turn, Math.round(dist));
+                sendBLECommand(effectiveTurn, Math.round(dist));
                 playChime(820, 1040);
             }
 
-            // Advance waypoint when rider reaches junction
-            if (dist <= 10) {
+            // Advance waypoint when rider completes the maneuver at the junction (<= 7m)
+            if (dist <= 7) {
                 activeWaypointIndex++;
                 evaluateTurnStep();
             }
@@ -2609,6 +2845,7 @@
             updateViewportHeight();
             initLeafletMap();
             startGPSTracking();
+            initOrientationTracking();
             initSlideToStart();
             initScrollNavBehavior();
 
